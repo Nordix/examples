@@ -1,0 +1,24 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+spec:
+  selector:
+    matchLabels:
+      networkservicemesh.io/app: "simple-client-ipv6"
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        networkservicemesh.io/app: "simple-client-ipv6"
+    spec:
+      serviceAccount: nsc-acc
+      containers:
+        - name: alpine-img
+          image: alpine:latest
+          imagePullPolicy: IfNotPresent
+          command: ["tail", "-f", "/dev/null"]
+metadata:
+  name: simple-client-ipv6
+  namespace: default
+  annotations:
+    ns.networkservicemesh.io: load-balancer-ipv6?app=lb-ipv6
