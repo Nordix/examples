@@ -37,6 +37,7 @@ type IpamEndpoint struct {
 // Request implements the request handler
 func (ice *IpamEndpoint) Request(
 	ctx context.Context, request *networkservice.NetworkServiceRequest) (*connection.Connection, error) {
+
 	srcIP, err := ice.ipam.Allocate()
 	if err != nil {
 		return nil, err
@@ -74,19 +75,31 @@ func (ice *IpamEndpoint) Close(ctx context.Context, connection *connection.Conne
 	if err == nil {
 		ice.ipam.Free(addr)
 	}
-
 	if endpoint.Next(ctx) != nil {
 		if _, err := endpoint.Next(ctx).Close(ctx, connection); err != nil {
 			return &empty.Empty{}, nil
 		}
 	}
-
 	return &empty.Empty{}, nil
 }
 
 // Name returns the composite name
 func (ice *IpamEndpoint) Name() string {
 	return "IPAM"
+}
+
+// Name returns service own ip
+func (ice *IpamEndpoint) getSelfIp() string {
+	return ice.SelfIP.String()
+}
+
+func (ice *IpamEndpoint) getSelfPrefix() string {
+	ipnet := &net.IPNet{
+		IP:   ice.SelfIP,
+		Mask: ice.ipam.CIDR.Mask,
+	}
+
+	return ipnet.String()
 }
 
 // NewIpamEndpoint creates a IpamEndpoint
@@ -96,10 +109,15 @@ func NewIpamEndpoint(configuration *common.NSConfiguration) *IpamEndpoint {
 		panic(err.Error())
 	}
 
+	// waste network address
+	ipam.ReserveFirstAndLast()
+
 	selfIP, err := ipam.Allocate()
 	if err != nil {
 		panic(err.Error())
 	}
+
+	logrus.Infof("Ipam done")
 
 	return &IpamEndpoint{
 		ipam:   ipam,
