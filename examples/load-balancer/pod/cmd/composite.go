@@ -17,6 +17,7 @@ package main
 
 import (
 	"context"
+	"net"
 
 	"github.com/networkservicemesh/networkservicemesh/sdk/endpoint"
 
@@ -47,7 +48,14 @@ func (vbc *vppAgentBridgeComposite) Request(ctx context.Context,
 		return endpoint.Next(ctx).Request(ctx, request)
 	}
 
-	return request.GetConnection(), nil
+	newConnection := request.GetConnection()
+	serverIp, _, err := net.ParseCIDR(newConnection.Context.IpContext.SrcIpAddr)
+	if err != nil {
+		return nil, err
+	}
+	scriptHook(ctx, "new_connection", serverIp.String())
+	
+	return newConnection, nil
 }
 
 func (vbc *vppAgentBridgeComposite) CreateBridgeDomain() {
@@ -61,8 +69,15 @@ func (vbc *vppAgentBridgeComposite) CreateBridgeDomain() {
 }
 
 func (vbc *vppAgentBridgeComposite) Close(ctx context.Context, conn *connection.Connection) (*empty.Empty, error) {
+
+	serverIp, _, err := net.ParseCIDR(conn.Context.IpContext.SrcIpAddr)
+	if err != nil {
+		return &empty.Empty{}, err
+	}
+	scriptHook(ctx, "del_connection", serverIp.String())
+
 	// remove from connections
-	err := vbc.insertVPPAgentInterface(conn, false, vbc.workspace)
+	err = vbc.insertVPPAgentInterface(conn, false, vbc.workspace)
 	if err != nil {
 		logrus.Error(err)
 		return &empty.Empty{}, err
@@ -70,7 +85,7 @@ func (vbc *vppAgentBridgeComposite) Close(ctx context.Context, conn *connection.
 
 	if endpoint.Next(ctx) != nil {
 		if _, err := endpoint.Next(ctx).Close(ctx, conn); err != nil {
-			return &empty.Empty{}, nil
+			return &empty.Empty{}, err
 		}
 	}
 

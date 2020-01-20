@@ -18,3 +18,4 @@ COPY --from=build /go/bin/bridge-domain /bin/bridge-domain
 RUN rm /opt/vpp-agent/dev/etcd.conf; echo 'Endpoint: "0.0.0.0:9113"' > /opt/vpp-agent/dev/grpc.conf; echo "disabled: true" > /opt/vpp-agent/dev/linux-plugin.conf; echo "disabled: true" > /opt/vpp-agent/dev/telemetry.conf
 COPY ./examples/load-balancer/pod/etc/ /etc/
 COPY ./examples/load-balancer/pod/etc/supervisord/supervisord.conf /opt/vpp-agent/dev/supervisor.conf
+COPY ./examples/load-balancer/pod/bin/ /bin/

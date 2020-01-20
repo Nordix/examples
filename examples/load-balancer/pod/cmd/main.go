@@ -17,7 +17,10 @@ package main
 
 import (
 	"context"
-
+	"os"
+	"os/exec"
+	"bufio"
+	
 	"github.com/networkservicemesh/networkservicemesh/controlplane/api/connection/mechanisms/memif"
 	"github.com/networkservicemesh/networkservicemesh/pkg/tools"
 	"github.com/networkservicemesh/networkservicemesh/sdk/common"
@@ -48,8 +51,45 @@ func main() {
 	if err := nsmEndpoint.Start(); err != nil {
 		logrus.Fatalf("Unable to start the endpoint: %v", err)
 	}
+	scriptHook(context.TODO(), "endpoint_started")
 
 	defer func() { _ = nsmEndpoint.Delete() }()
 
 	<-c
+}
+
+func scriptHook(ctx context.Context, args ...string) {
+	hook := os.Getenv("NSE_HOOK")
+	if hook == "" {
+		logrus.Debug("NSE_HOOK not set. Ignoring hook; ", args)
+		return
+	}
+	script, err := exec.LookPath(hook)
+	if err != nil {
+		logrus.Error("NSE_HOOK not executable; ", hook, ", ignoring hook;", args)
+		return
+	}
+	logrus.Info("Calling NSE_HOOK; ", args)
+
+	cmd := exec.CommandContext(ctx, script, args...)
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		logrus.Error("NSE_HOOK failed to get stderr; ", args, err)
+		return
+	}
+
+	if err = cmd.Start(); err != nil {
+		logrus.Error("NSE_HOOK Start failed; ", args, err)
+	}
+
+	// Log all printouts to stderr
+	scanner := bufio.NewScanner(stderr)
+    for scanner.Scan() {
+        logrus.Info("NSE_HOOK stderr; ", scanner.Text())
+    }
+
+	if err := cmd.Wait(); err != nil {
+		logrus.Error("NSE_HOOK returned error; ", args, err)
+	}
 }

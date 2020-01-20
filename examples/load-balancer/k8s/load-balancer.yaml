@@ -27,9 +27,21 @@ spec:
               value: "true"
             - name: IP_ADDRESS
               value: "10.60.1.0/24"
+            - name: VIP_ADDRESS
+              value: "10.2.2.0/24"
+            - name: NSE_HOOK
+              value: "/bin/nsehook.sh"
           resources:
             limits:
               networkservicemesh.io/socket: 1
+          securityContext:
+            privileged: true
+        - name: alpine-img
+          image: alpine:latest
+          imagePullPolicy: IfNotPresent
+          command: ["tail", "-f", "/dev/null"]
+          securityContext:
+            privileged: true
 metadata:
   name: load-balancer
   namespace: default

@@ -17,6 +17,10 @@ spec:
           image: alpine:latest
           imagePullPolicy: IfNotPresent
           command: ["tail", "-f", "/dev/null"]
+          securityContext:
+            privileged: true
+        - name: mconnect
+          image: docker.io/nordixorg/mconnect:v1.2
 metadata:
   name: simple-client
   namespace: default
