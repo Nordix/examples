@@ -88,26 +88,39 @@ rtt min/avg/max/mdev = 2.703/2.703/2.703/0.000 ms
 
 
 
-## TEMPORARY client setup
+## Client setup
 
-The "standard" `simple-client` is currently used. It is not
-configurable so as a temporary work-around the clients are setup manually;
+The client is an `alpine:latest` image with a ConfigMap used as
+init-scrip. This allows us to define start-up commands in the
+[manifest](./k8s/simple-client.yaml).
 
 ```
-l=networkservicemesh.io/app=simple-client
-for p in $(kubectl get pod -l $l -o json | jq -r .items[].metadata.name); do
-  kubectl exec -c alpine-img $p ip ro add 10.70.0.0/31 via 10.60.1.1
-  kubectl exec -c alpine-img $p ip addr add 10.2.2.0/24 dev lo
-  kubectl exec -c alpine-img $p ip link set up dev gre0
-done
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: client-init
+data:
+  client-init: |
+    ip addr add 10.2.2.0/24 dev lo
+    ip link set up dev gre0
+    ip ro add 10.70.0.0/31 via 10.60.1.1
+    ip ro add 33.0.0.0/24 via 10.60.1.1
+    nc -lk -p 5001 -e hostname
 ```
 
-As you can see the `gre0` interface must be set "up". This is because
-the VPP lb uses gre encapsulation.
+The VIP address is assigned to the loopback interface. The host must
+have the VIP address since no NAT is made and packets arrive with the
+VIP as destination.
 
-The client is extended with an [mconnect](https://github.com/Nordix/mconnect)
-container that opens port tcp/5001 with a server that replies with the
-hostname.
+The `gre0` interface must be set "up". This is because the VPP lb uses
+gre encapsulation.
+
+Routes are setup to the veth-pair to allow communication with the
+load-balancer NSE POD. This is used for testing. A route to the
+external test network `33.0.0.0/24` is also setup.
+
+The last `nc` command will block and will answer all incomming tcp
+connects on port 5001 with it's host name (pod name).
 
 
 
@@ -129,14 +142,14 @@ Check the load-balancer status;
 vppctl show lb vips verbose
 ```
 
-## Manual testing
+## Manual testing from the load-balancer POD
 
 The load-balancer POD is extended with an "alpine" container (same as
-the "simple-client") which has more tools for testing. Login with;
+the "simple-client") which has the `nc` program installed. Login with;
 
 ```
 kubectl get pods -l networkservicemesh.io/app=load-balancer
-kubectl exec -it -c alpine-img <pod-id> bash
+kubectl exec -it -c alpine-img <pod-id> sh
 ```
 
 Inside the alpine container use netcat (nc) to check load-balancing;

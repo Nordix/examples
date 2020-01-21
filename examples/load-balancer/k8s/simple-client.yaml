@@ -16,13 +16,31 @@ spec:
         - name: alpine-img
           image: alpine:latest
           imagePullPolicy: IfNotPresent
-          command: ["tail", "-f", "/dev/null"]
+          command: ["sh", "-f", "/client-init/client-init"]
           securityContext:
             privileged: true
-        - name: mconnect
-          image: docker.io/nordixorg/mconnect:v1.2
+          volumeMounts:
+            - mountPath: /client-init
+              name: client-init
+      volumes:
+        - name: client-init
+          configMap:
+            name: client-init
+
 metadata:
   name: simple-client
   namespace: default
   annotations:
     ns.networkservicemesh.io: load-balancer?app=lb
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: client-init
+data:
+  client-init: |
+    ip addr add 10.2.2.0/24 dev lo
+    ip link set up dev gre0
+    ip ro add 10.70.0.0/31 via 10.60.1.1
+    ip ro add 33.0.0.0/24 via 10.60.1.1
+    nc -lk -p 5001 -e hostname

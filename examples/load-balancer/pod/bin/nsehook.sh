@@ -57,6 +57,7 @@ cmd_endpoint_started() {
 	x vppctl create host-interface name vpp1out
 	x vppctl set int state host-vpp1out up
 	x vppctl set int ip address host-vpp1out 10.70.0.1/31
+	x vppctl ip route add 33.0.0.0/24 via 10.70.0.0 host-vpp1out
 
 	x vppctl create loopback interface
 	x vppctl set int l2 bridge loop0 1 bvi
@@ -69,6 +70,7 @@ cmd_endpoint_started() {
 	x vppctl lb vip $VIP_ADDRESS
 	x vppctl lb conf ip4-src-address 10.60.1.1
 	x ip ro add $VIP_ADDRESS via 10.70.0.1
+
 
 	return 0
 }

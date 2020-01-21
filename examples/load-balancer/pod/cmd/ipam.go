@@ -112,9 +112,6 @@ func NewIpamEndpoint(configuration *common.NSConfiguration) *IpamEndpoint {
 	// waste network address
 	ipam.ReserveFirstAndLast()
 
-	ipam.Allocate() // .1 to the loopback
-	ipam.Allocate() // .2 to the load-balancer
-
 	selfIP, err := ipam.Allocate()
 	if err != nil {
 		panic(err.Error())
