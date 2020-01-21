@@ -22,8 +22,8 @@ tutorial](https://wiki.fd.io/view/VPP/Tutorial_Routing_and_Switching).
 
 Login to the load-balancer POD with `kubectl exec`;
 ```
-kubectl get pods -l networkservicemesh.io/app=load-balancer
-kubectl exec -it -c load-balancer <pod-id> bash
+kubectl exec -it -c load-balancer \
+ $(kubectl get pods -l networkservicemesh.io/app=load-balancer -o name) bash
 ```
 
 
@@ -91,7 +91,7 @@ rtt min/avg/max/mdev = 2.703/2.703/2.703/0.000 ms
 ## Client setup
 
 The client is an `alpine:latest` image with a ConfigMap used as
-init-scrip. This allows us to define start-up commands in the
+init-script. This allows us to define start-up commands in the
 [manifest](./k8s/simple-client.yaml).
 
 ```
@@ -148,16 +148,44 @@ The load-balancer POD is extended with an "alpine" container (same as
 the "simple-client") which has the `nc` program installed. Login with;
 
 ```
-kubectl get pods -l networkservicemesh.io/app=load-balancer
-kubectl exec -it -c alpine-img <pod-id> sh
+kubectl exec -it -c alpine-img \
+ $(kubectl get pods -l networkservicemesh.io/app=load-balancer -o name) sh
 ```
 
 Inside the alpine container use netcat (nc) to check load-balancing;
 
 ```
-nc 10.2.2.2 5001 < /dev/null; echo
+nc 10.2.2.2 5001 < /dev/null
 # (repeat...)
 ```
+
+
+## External access
+
+The [CNF use-case](https://github.com/cncf/cnf-testbed/issues/305)
+ensures network separation by bringing in an interface into the
+load-balancer NSE POD. That procedure is however not supported by NSM
+and there is no prefered procedure to do that dynamically AFAIK. At
+POD start-up this can be done by a CNI-plugin like "multus".
+
+Since there is no standard way to bring in an interface from the node
+to a POD this part is skipped in this example. Instead external
+traffic can be routed to the load-balancer NSE POD through the normal
+K8s pod address on the K8s node where the POD is executing. Example;
+
+```
+pod=$(kubectl get pods -l networkservicemesh.io/app=load-balancer -o name)
+kubectl get $pod -o json | jq .spec.nodeName   # We must be on this node!
+kubectl get $pod -o json | jq -r .status.podIP # This is the pod address
+ip ro add 10.2.2.0/24 via $(kubectl get $pod -o json | jq -r .status.podIP)
+```
+
+The clients are setup with routing to an external CIDR;
+`33.0.0.0/24`. If you do not use a source from this range you will get
+asymmetric routing (DSR actually) which *may* work, but it is not
+showing network separation.
+
+
 
 
 ## Implementation and trouble shooting
@@ -168,6 +196,7 @@ script. Check and alter as you see fit.
 The commands executed are logged;
 
 ```
-kubectl get pods -l networkservicemesh.io/app=load-balancer
-kubectl logs -c load-balancer <pod-id> | grep NSE_HOOK
+kubectl get pods -l networkservicemesh.io/app=load-balancer -o name
+kubectl logs -c load-balancer \
+ $(kubectl get pods -l networkservicemesh.io/app=load-balancer -o name) | grep NSE_HOOK
 ```
